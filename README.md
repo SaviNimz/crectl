@@ -68,9 +68,10 @@ wso2-status            # shortcut
 actually running, and gives you clickable portal URLs even when you've set offsets on
 several instances. Use `--json` to pipe the output into `jq` or scripts.
 
-Detection matches Carbon signatures such as `-Dcarbon.home=`, `wso2server.sh`,
-`micro-integrator.sh`, and `streaming-integrator.sh`. Supported products include API Manager,
-Identity Server (and IS-as-KM), EI, MI, SI, SP, ESB, DAS, and IoT Server.
+A product is detected by the `-Dcarbon.home=` flag its startup script passes to the JVM, so
+the `sh wso2server.sh` launcher shell in front of it isn't listed. Supported products include API Manager,
+Identity Server (and IS-as-KM), the API-M 4.5+ distributions (API Control Plane, Universal
+Gateway, Traffic Manager), EI, MI, SI, SP, ESB, DAS, and IoT Server.
 
 ### `wso2ctl stop <target>`
 
@@ -160,6 +161,107 @@ wso2ctl usage --json
 memory before you take a thread dump or heap dump. Get the PID here, then run
 `jstack <pid>` or `jcmd <pid> GC.heap_dump`.
 
+### `wso2ctl ports`
+
+Shows which ports each running product uses, and checks whether an offset is free
+*before* you start another pack.
+
+```sh
+wso2ctl ports                          # ports of every running product
+wso2ctl ports --offset 3               # are API Manager's ports free at offset 3?
+wso2ctl ports --offset 12 --product mi # same check for Micro Integrator
+wso2ctl ports --suggest                # lowest free offset for API Manager
+wso2ctl ports --suggest --product is   # ... for Identity Server
+```
+
+| Flag | Effect |
+|---|---|
+| `--offset <n>` | Check every port the product would bind at this offset. Exits `1` if any are taken. |
+| `--suggest` | Find the lowest offset where all the product's ports are free, and print the config to use |
+| `--product <name>` | Product to check with `--offset`/`--suggest`: `am` (default), `acp`, `gw`, `tm`, `is`, `mi` |
+| `--json` | Machine-readable output |
+
+With no flags, each running instance is listed with its offset and where the offset came from
+(a `-DportOffset` flag, `[server] offset` in `deployment.toml`, or the product default). Each
+expected port is shown as `listening` or `NOT LISTENING`, next to what it's for (management
+HTTPS, gateway HTTP/S, WebSocket, WebSub, Thrift, JMS, JMX, and so on). Ports that aren't standard
+WSO2 ports, such as a remote debug agent, are listed separately.
+
+With `--offset`, any port that's taken shows **who holds it** (PID and process name). That
+includes processes owned by other users, which `lsof` can't see without sudo. For example,
+macOS `launchd` listens on 8021, which clashes with API-M 4.x's WebSub HTTPS port at offset 0.
+
+**Debugging use:** stop guessing offsets. Before starting a second or third pack for a repro,
+`--suggest` gives you an offset that works first time, so you don't get a half-started server
+with `Address already in use` buried in the log. When a server starts but something doesn't
+respond, `wso2ctl ports` shows which listener never came up.
+
+> Micro Integrator has a built-in offset of 10 (HTTP 8290, Management API 9164), so its offsets
+> start at 10.
+
+### `wso2ctl dump <target>`
+
+Captures thread dumps, a heap dump, and/or a Java Flight Recording from a running product,
+all in one timestamped folder. `<target>` works like `stop`: a PID or a name match.
+
+```sh
+wso2ctl dump 4.3.0                        # 3 thread dumps, 5s apart (the usual support ask)
+wso2ctl dump 48213 --threads 5 --interval 10
+wso2ctl dump am --heap                    # thread dumps + heap dump
+wso2ctl dump am --jfr 60                  # thread dumps while a 60s JFR recording runs
+wso2ctl dump am --threads 0 --heap        # heap dump only
+```
+
+| Flag | Effect |
+|---|---|
+| `--threads <count>` | Number of thread dumps (default `3`; `0` to skip) |
+| `--interval <s>` | Seconds between thread dumps (default `5`) |
+| `--heap` | Also take a heap dump (`.hprof`). The JVM pauses while it's written, and the file is roughly the size of the used heap. |
+| `--jfr <s>` | Also record a JFR for this many seconds. It starts first, so the thread dumps are taken while it records. |
+| `--out <dir>` | Parent folder for the dumps (default `./wso2ctl-dumps`) |
+
+Output goes to `<out>/<pack>-pid<PID>-<timestamp>/`:
+
+```
+process-info.txt     product, PID, CARBON_HOME, full JVM command line
+thread-dump-1..N.txt jcmd Thread.print -l (includes lock info)
+thread-cpu-1..N.txt  per-thread CPU from top -H (Linux only), to match against the nid in each dump
+heap-dump.hprof      with --heap
+recording.jfr        with --jfr (open in JDK Mission Control)
+```
+
+`jcmd` is taken from **the same JDK the server is running on**, so you won't get attach
+errors from a mismatched JDK on your PATH.
+
+**Debugging use:** when you reproduce a hang, a CPU spike, or a slow API, capture the same
+evidence support asks customers for, with one command, before the moment passes. Pair it
+with `wso2ctl usage` to find the busy pack first.
+
+### `wso2ctl inspect <target>`
+
+A one-screen summary of a pack's setup. `<target>` can be a **pack directory (running or
+not)**, a PID, or a name match.
+
+```sh
+wso2ctl inspect ~/cases/CS0012345/wso2am-4.3.0   # any extracted pack
+wso2ctl inspect 4.3.0                            # a running instance
+wso2ctl inspect 48213 --json
+```
+
+| Section | What it shows |
+|---|---|
+| Product | Product, version, location, and the **update level** recorded by the WSO2 Updates 2.0 tool |
+| Runtime | Running or not, PID, uptime, **JDK version and path**, `-Xms`/`-Xmx`. For a stopped pack, the JDK `JAVA_HOME` would start it with. |
+| Ports | Effective port offset (and where it came from) and the primary port |
+| Configuration | `deployment.toml` path, key manager (resident or external), datasources (type, user, JDBC URL with passwords masked), gateway environments |
+| Keystores | Primary and TLS keystores and the truststore: entry count and **certificate expiry**, with a warning if the certificate has expired or expires within 30 days. Handles `.jks` and `.p12`, and passwords set via `$env{}`. Secure Vault (`$secret{}`) passwords are reported but not decrypted. |
+| Extensions | Jars in `components/lib` and `dropins` (auto-generated OSGi bundles hidden), and WUM patches |
+
+**Debugging use:** when you pick up a case or reuse an old repro pack, see immediately whether it
+matches what the customer runs: the same update level, JDK, database type, and custom jars.
+It also catches the classic "my local pack suddenly fails TLS" problem, because an expired
+default `wso2carbon` certificate is flagged as `CERTIFICATE HAS EXPIRED`.
+
 ### `wso2ctl list`
 
 Prints every available command, including any new ones you add, with a one-line description.
@@ -173,11 +275,14 @@ wso2ctl list
 ## Typical debugging session
 
 ```sh
+wso2ctl inspect ./wso2am-4.2.0 # check update level, DBs, jars against the customer's setup
 wso2ctl stop-all -y            # clean slate
 wso2ctl jvm use 11             # match the customer's JDK
+wso2ctl ports --suggest        # pick a clash-free offset for the next pack
 # start the pack(s) you need
 wso2ctl status                 # confirm what's up + grab portal URLs
 wso2ctl usage --sort mem       # watch resource usage while reproducing
+wso2ctl dump 4.2.0 --jfr 60    # capture evidence while the issue is happening
 wso2ctl stop 4.2.0             # restart just one pack after a config change
 ```
 

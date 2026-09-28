@@ -34,7 +34,7 @@ function register(program: Command): void {
             portals?.admin ?? '-',
             portals?.publisher ?? '-',
             portals?.devportal ?? '-',
-            p.carbonHome || '-',
+            p.carbonHome,
           ];
         })
       );

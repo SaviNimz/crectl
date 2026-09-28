@@ -1,6 +1,9 @@
 const PRODUCT_PREFIX_MAP: Record<string, string> = {
   wso2am: 'API Manager',
   'wso2am-analytics': 'API Manager Analytics',
+  'wso2am-acp': 'API Control Plane',
+  'wso2am-universal-gw': 'Universal Gateway',
+  'wso2am-tm': 'Traffic Manager',
   wso2is: 'Identity Server',
   'wso2is-km': 'Identity Server KM',
   wso2ei: 'Enterprise Integrator',

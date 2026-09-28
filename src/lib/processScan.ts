@@ -4,25 +4,12 @@ import { resolveProduct } from './productMap.js';
 import { getListeningPorts } from './portScan.js';
 import type { WSO2Process } from '../types.js';
 
-// Only these are treated as WSO2 signatures — a bare "wso2" substring
-// anywhere in a command (e.g. this very tool's own install path) is not
-// enough, to avoid false positives.
-const WSO2_SIGNATURES = [
-  /-Dcarbon\.home=/,
-  /wso2server\.sh/,
-  /micro-integrator\.sh/,
-  /streaming-integrator\.sh/,
-  /wso2carbon\.sh/,
-];
-
-function isWso2Process(command: string): boolean {
-  return WSO2_SIGNATURES.some((re) => re.test(command));
-}
-
-function extractCarbonHome(command: string): string {
-  const match = command.match(/-Dcarbon\.home=(\S+)/);
-  return match?.[1] ?? '';
-}
+// Every WSO2 product's startup script (wso2server.sh, micro-integrator.sh, ...)
+// launches the JVM with -Dcarbon.home, so that flag is the signature. Matching
+// the script names too would also pick up the `sh wso2server.sh` launcher shell
+// that sits in front of each JVM, and a bare "wso2" substring would match
+// unrelated paths (e.g. this tool's own install directory).
+const CARBON_HOME_FLAG = /-Dcarbon\.home=(\S+)/;
 
 /** Scans running processes for WSO2 Carbon-based product instances. */
 export function scanWso2Processes(): WSO2Process[] {
@@ -43,12 +30,11 @@ export function scanWso2Processes(): WSO2Process[] {
     const match = trimmed.match(/^(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$/);
     if (!match) continue;
     const [, pidStr, etime, cpuStr, memStr, rssStr, command] = match;
-    if (!isWso2Process(command)) continue;
+    const carbonHomeMatch = command.match(CARBON_HOME_FLAG);
+    if (!carbonHomeMatch) continue;
 
-    const carbonHome = extractCarbonHome(command);
-    const { product, version } = carbonHome
-      ? resolveProduct(path.basename(carbonHome))
-      : { product: 'WSO2 (unrecognized product)', version: '' };
+    const carbonHome = carbonHomeMatch[1];
+    const { product, version } = resolveProduct(path.basename(carbonHome));
 
     results.push({
       pid: Number(pidStr),

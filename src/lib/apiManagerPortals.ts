@@ -28,9 +28,12 @@ function majorVersion(version: string): number {
   return match ? Number(match[1]) : 0;
 }
 
-/** Returns null for anything that isn't API Manager (these portals don't exist there). */
+// From API-M 4.5 the portals ship in the separate API Control Plane distribution.
+const PRODUCTS_WITH_PORTALS = ['API Manager', 'API Control Plane'];
+
+/** Returns null for products that don't serve the API Manager portals. */
 export function getPortalUrls(p: WSO2Process): PortalUrls | null {
-  if (p.product !== 'API Manager') return null;
+  if (!PRODUCTS_WITH_PORTALS.includes(p.product)) return null;
 
   const port = resolveTransportPort(p);
   if (!port) return { admin: null, publisher: null, devportal: null };
