@@ -1,28 +1,11 @@
 # wso2ctl
 
-A small CLI for seeing and controlling the WSO2 products running on your machine.
-
-It was built for **CRE engineers doing local debugging**. When you're reproducing a
-customer issue you often have several packs running at once, such as API Manager 3.2.0 next to 4.2.0
-with a port offset, an Identity Server acting as Key Manager, and a Docker
-container or two. Each one may need a different JDK. `wso2ctl` answers the usual
-questions quickly:
-
-- *What's running right now, and where is its `CARBON_HOME`?*
-- *Which port did that offset instance land on? What's the Publisher URL?*
-- *Which pack is using all my memory?*
-- *Kill everything so I can start clean.*
-- *Switch me to JDK 11 for this old pack, then back to 17.*
-
-With `wso2ctl` you don't have to piece this together from `ps aux | grep carbon`, `lsof`, and
-`docker ps`.
-
+A small CLI for seeing and controlling the WSO2 products running on your machine. This is built for **CRE engineers doing local debugging**.
 ---
 
 ## Quick install
 
-**Requirements:** Node.js 18+ and macOS. Linux works for everything except `jvm`.
-Docker is optional and only needed for the container commands.
+**Requirements:** Node.js 18+ and macOS.
 
 ```sh
 git clone https://github.com/SaviNimz/wso2ctl.git
@@ -32,8 +15,7 @@ npm run build
 npm link
 ```
 
-That's it. `wso2ctl`, `wso2-status`, and `wso2-stop-all` are now available in any
-terminal. Verify with:
+Verify with:
 
 ```sh
 wso2ctl --version
