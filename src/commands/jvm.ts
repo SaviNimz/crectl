@@ -5,7 +5,7 @@ import {
   findInstalledJdk,
   switchToJdk,
   getActiveJdkPath,
-  isShellUsingWso2ctlJava,
+  isShellUsingCrectlJava,
   isMajorVersionOnly,
   JAVA_SYMLINK,
 } from '../lib/jvmManager.js';
@@ -50,7 +50,7 @@ async function confirmIfDefaultWouldChange(release: TemurinRelease, assumeYes: b
   console.log('');
   console.log(`Note: Temurin ${release.version} would be the newest JDK on this Mac, so it would also become`);
   console.log(`macOS's default Java (currently ${currentDefault.version}). That affects /usr/bin/java and anything`);
-  console.log('that runs /usr/libexec/java_home without -v, not just wso2ctl.');
+  console.log('that runs /usr/libexec/java_home without -v, not just crectl.');
   if (!process.stdin.isTTY) {
     throw new Error('Nothing was installed. Re-run with --yes to install it anyway.');
   }
@@ -63,7 +63,7 @@ async function installMissingJdk(requestedVersion: string, assumeYes: boolean): 
   if (!isMajorVersionOnly(requestedVersion)) {
     throw new Error(
       `JDK ${requestedVersion} is not installed. Auto-install only takes a major version — ` +
-        `try "wso2ctl jvm use ${parseFeatureVersion(requestedVersion)}" to get the latest one.`
+        `try "crectl jvm use ${parseFeatureVersion(requestedVersion)}" to get the latest one.`
     );
   }
   const featureVersion = parseFeatureVersion(requestedVersion)!;
@@ -90,9 +90,9 @@ async function installMissingJdk(requestedVersion: string, assumeYes: boolean): 
 }
 
 function printShellSetupStatus(): void {
-  if (isShellUsingWso2ctlJava()) {
+  if (isShellUsingCrectlJava()) {
     // JAVA_HOME points at the symlink, so every such shell — already-open ones included — sees the new JDK at once.
-    console.log('Active immediately in every terminal that uses wso2ctl\'s JAVA_HOME, including ones already open.');
+    console.log('Active immediately in every terminal that uses crectl\'s JAVA_HOME, including ones already open.');
     return;
   }
   console.log('');
@@ -100,7 +100,7 @@ function printShellSetupStatus(): void {
   console.log('  so the switch has no effect in it yet. One-time setup: add these lines at the END of your');
   console.log('  shell profile (e.g. ~/.zshrc), after any other JAVA_HOME lines, then open a new terminal:');
   console.log('');
-  console.log('    export JAVA_HOME="$HOME/.wso2ctl/java"');
+  console.log('    export JAVA_HOME="$HOME/.crectl/java"');
   console.log('    export PATH="$JAVA_HOME/bin:$PATH"');
 }
 
@@ -113,14 +113,14 @@ function describeLocation(location: JdkLocation | null, whenMissing: string): st
 }
 
 function printJavaEnvironment(): void {
-  const { shell, wso2ctlGlobal, macOsDefault } = getJavaEnvironment();
+  const { shell, crectlGlobal, macOsDefault } = getJavaEnvironment();
 
   printSection('This shell', [
     ['JAVA_HOME', describeLocation(shell.javaHome, 'not set')],
     ['java on PATH', describeLocation(shell.javaOnPath, 'none found')],
-    ['Follows wso2ctl', shell.followsWso2ctl ? 'yes — changes with "wso2ctl jvm use"' : 'no — JAVA_HOME is not ~/.wso2ctl/java'],
+    ['Follows crectl', shell.followsCrectl ? 'yes — changes with "crectl jvm use"' : 'no — JAVA_HOME is not ~/.crectl/java'],
   ]);
-  printSection('wso2ctl global (jvm use)', [['JDK', describeLocation(wso2ctlGlobal, 'not set — run "wso2ctl jvm use <version>"')]]);
+  printSection('crectl global (jvm use)', [['JDK', describeLocation(crectlGlobal, 'not set — run "crectl jvm use <version>"')]]);
   printSection('macOS default (/usr/bin/java)', [['JDK', describeLocation(macOsDefault, 'none registered')]]);
 
   const javaHomeVersion = shell.javaHome?.version;
@@ -149,7 +149,7 @@ function register(program: Command): void {
         assertMac();
         const jdks = listJdks();
         if (jdks.length === 0) {
-          console.log('No JDKs found. "wso2ctl jvm use <version>" downloads one.');
+          console.log('No JDKs found. "crectl jvm use <version>" downloads one.');
           return;
         }
         const activeJdkPath = getActiveJdkPath();
@@ -164,7 +164,7 @@ function register(program: Command): void {
 
   jvm
     .command('current')
-    .description('Show the active JVM: in this shell, the wso2ctl global one, and the macOS default')
+    .description('Show the active JVM: in this shell, the crectl global one, and the macOS default')
     .option('--json', 'output as JSON')
     .action((opts) => {
       try {
@@ -196,7 +196,7 @@ function register(program: Command): void {
         let jdkHome = installedJdk?.path;
         if (!jdkHome) {
           if (!opts.install) {
-            throw new Error(`JDK ${version} is not installed. Run "wso2ctl jvm list" to see what is, or drop --no-install to download it.`);
+            throw new Error(`JDK ${version} is not installed. Run "crectl jvm list" to see what is, or drop --no-install to download it.`);
           }
           jdkHome = await installMissingJdk(version, Boolean(opts.yes));
         }

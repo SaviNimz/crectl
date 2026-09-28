@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const target = path.join(__dirname, 'wso2ctl.js');
+const target = path.join(__dirname, 'crectl.js');
 
 const result = spawnSync(process.execPath, [target, 'status', ...process.argv.slice(2)], {
   stdio: 'inherit',

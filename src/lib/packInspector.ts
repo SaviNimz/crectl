@@ -165,9 +165,9 @@ function defaultKeystoreFile(securityDir: string, baseName: string): string {
 
 function runKeytool(keytoolPath: string, args: string[], password: string): { ok: boolean; output: string } {
   // Pass the password through the environment so it never shows up in `ps`.
-  const result = spawnSync(keytoolPath, [...args, '-storepass:env', 'WSO2CTL_STORE_PASSWORD'], {
+  const result = spawnSync(keytoolPath, [...args, '-storepass:env', 'CRECTL_STORE_PASSWORD'], {
     encoding: 'utf8',
-    env: { ...process.env, WSO2CTL_STORE_PASSWORD: password },
+    env: { ...process.env, CRECTL_STORE_PASSWORD: password },
   });
   return { ok: result.status === 0, output: `${result.stdout}${result.stderr}` };
 }

@@ -1,13 +1,13 @@
 {
-  "name": "wso2-tools",
+  "name": "crectl",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Extensible CLI toolkit for managing local WSO2 product instances",
   "bin": {
-    "wso2ctl": "./dist/bin/wso2ctl.js",
-    "wso2-status": "./dist/bin/wso2-status.js",
-    "wso2-stop-all": "./dist/bin/wso2-stop-all.js"
+    "crectl": "./dist/bin/crectl.js",
+    "crectl-status": "./dist/bin/crectl-status.js",
+    "crectl-stop-all": "./dist/bin/crectl-stop-all.js"
   },
   "scripts": {
     "build": "tsc && chmod +x dist/bin/*.js",

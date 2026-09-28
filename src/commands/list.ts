@@ -30,7 +30,7 @@ function flattenCommands(cmd: Command, prefix: string[] = []): CommandRow[] {
 function register(program: Command): void {
   program
     .command('list')
-    .description('List all available wso2ctl commands')
+    .description('List all available crectl commands')
     .action(() => {
       const rows = flattenCommands(program).sort((a, b) => a.name.localeCompare(b.name));
       printTable(

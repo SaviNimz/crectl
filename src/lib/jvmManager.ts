@@ -3,12 +3,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseFeatureVersion, type JdkInfo } from './jdkDiscovery.js';
 
-const WSO2CTL_DIR = path.join(os.homedir(), '.wso2ctl');
-export const JAVA_SYMLINK = path.join(WSO2CTL_DIR, 'java');
+const CRECTL_DIR = path.join(os.homedir(), '.crectl');
+export const JAVA_SYMLINK = path.join(CRECTL_DIR, 'java');
 
 export function assertMac(): void {
   if (process.platform !== 'darwin') {
-    throw new Error('wso2ctl jvm currently only supports macOS.');
+    throw new Error('crectl jvm currently only supports macOS.');
   }
 }
 
@@ -38,7 +38,7 @@ export function findInstalledJdk(requestedVersion: string, jdks: JdkInfo[]): Jdk
   return matchingJdks.find((jdk) => jdk.architecture === nativeArchitecture) ?? matchingJdks[0] ?? null;
 }
 
-/** Path the `~/.wso2ctl/java` symlink currently points to, or null if unset. */
+/** Path the `~/.crectl/java` symlink currently points to, or null if unset. */
 export function getActiveJdkPath(): string | null {
   try {
     return fs.readlinkSync(JAVA_SYMLINK);
@@ -48,13 +48,13 @@ export function getActiveJdkPath(): string | null {
 }
 
 /**
- * Repoints `~/.wso2ctl/java` at the given JDK home. This is the only way a
+ * Repoints `~/.crectl/java` at the given JDK home. This is the only way a
  * CLI process can affect the "global" JVM version, since a subprocess
  * cannot mutate its parent shell's environment — the user's shell profile
  * must point JAVA_HOME at this stable symlink once.
  */
 export function switchToJdk(jdkHome: string): void {
-  fs.mkdirSync(WSO2CTL_DIR, { recursive: true });
+  fs.mkdirSync(CRECTL_DIR, { recursive: true });
   try {
     fs.unlinkSync(JAVA_SYMLINK);
   } catch {
@@ -63,7 +63,7 @@ export function switchToJdk(jdkHome: string): void {
   fs.symlinkSync(jdkHome, JAVA_SYMLINK);
 }
 
-/** Whether the shell that ran this command takes JAVA_HOME from the wso2ctl symlink. */
-export function isShellUsingWso2ctlJava(): boolean {
+/** Whether the shell that ran this command takes JAVA_HOME from the crectl symlink. */
+export function isShellUsingCrectlJava(): boolean {
   return process.env.JAVA_HOME === JAVA_SYMLINK;
 }

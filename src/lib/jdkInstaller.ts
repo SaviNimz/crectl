@@ -11,7 +11,7 @@ const ADOPTIUM_API = 'https://api.adoptium.net/v3';
 
 /**
  * macOS's `java_home` also scans this per-user folder, so a JDK unpacked
- * here is picked up by `wso2ctl jvm list` without needing sudo (unlike
+ * here is picked up by `crectl jvm list` without needing sudo (unlike
  * /Library/Java/JavaVirtualMachines).
  */
 export const USER_JVM_DIR = path.join(os.homedir(), 'Library', 'Java', 'JavaVirtualMachines');
@@ -115,10 +115,10 @@ export async function installTemurin(release: TemurinRelease, featureVersion: nu
     throw new Error(`${bundlePath} already exists but java_home doesn't list it. Remove it and try again.`);
   }
 
-  const downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wso2ctl-jdk-'));
+  const downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'crectl-jdk-'));
   // Unpack next to the final location so the last step is a same-volume rename.
   fs.mkdirSync(USER_JVM_DIR, { recursive: true });
-  const extractDir = fs.mkdtempSync(path.join(USER_JVM_DIR, '.wso2ctl-unpack-'));
+  const extractDir = fs.mkdtempSync(path.join(USER_JVM_DIR, '.crectl-unpack-'));
 
   try {
     const archivePath = path.join(downloadDir, release.fileName);

@@ -6,7 +6,7 @@ const VERSION = '0.1.0';
 
 const program = new Command();
 program
-  .name('wso2ctl')
+  .name('crectl')
   .description('CLI toolkit for managing local WSO2 product instances')
   .version(VERSION);
 

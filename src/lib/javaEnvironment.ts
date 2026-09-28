@@ -8,7 +8,7 @@ import { getJavaVersion } from './jdkTools.js';
 const MACOS_JAVA_STUB = '/usr/bin/java';
 
 export interface JdkLocation {
-  /** The path as configured (may be a symlink, like ~/.wso2ctl/java). */
+  /** The path as configured (may be a symlink, like ~/.crectl/java). */
   path: string;
   /** Where that path actually leads. */
   resolvedPath: string;
@@ -20,9 +20,9 @@ export interface JavaEnvironment {
     javaHome: JdkLocation | null;
     /** The `java` this terminal runs when you type `java`. */
     javaOnPath: JdkLocation | null;
-    followsWso2ctl: boolean;
+    followsCrectl: boolean;
   };
-  wso2ctlGlobal: JdkLocation | null;
+  crectlGlobal: JdkLocation | null;
   macOsDefault: JdkLocation | null;
 }
 
@@ -68,7 +68,7 @@ function describeJavaOnPath(): JdkLocation | null {
 /**
  * Which Java is in effect, at each level: this terminal (JAVA_HOME and the
  * `java` on PATH — a CLI inherits both from the shell that ran it), the
- * wso2ctl global symlink, and macOS's system default.
+ * crectl global symlink, and macOS's system default.
  */
 export function getJavaEnvironment(): JavaEnvironment {
   const javaHome = process.env.JAVA_HOME;
@@ -79,9 +79,9 @@ export function getJavaEnvironment(): JavaEnvironment {
     shell: {
       javaHome: javaHome ? describeJdkHome(javaHome) : null,
       javaOnPath: describeJavaOnPath(),
-      followsWso2ctl: javaHome === JAVA_SYMLINK,
+      followsCrectl: javaHome === JAVA_SYMLINK,
     },
-    wso2ctlGlobal: activeJdkPath ? describeJdkHome(activeJdkPath) : null,
+    crectlGlobal: activeJdkPath ? describeJdkHome(activeJdkPath) : null,
     macOsDefault: macOsDefault ? describeJdkHome(macOsDefault.path) : null,
   };
 }

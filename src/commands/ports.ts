@@ -103,7 +103,7 @@ async function showOffsetCheck(product: string, offset: number, asJson: boolean)
     console.log(
       conflicts.length === 0
         ? `\nAll ${checks.length} ports are free — safe to start with offset ${offset}.`
-        : `\n${conflicts.length} port(s) in use. Run "wso2ctl ports --suggest --product <name>" to find a free offset.`
+        : `\n${conflicts.length} port(s) in use. Run "crectl ports --suggest --product <name>" to find a free offset.`
     );
   }
   if (conflicts.length > 0) process.exitCode = 1;

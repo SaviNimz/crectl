@@ -10,5 +10,5 @@ import inspect from './inspect.js';
 import list from './list.js';
 
 // Adding a new command: create the file above and add it to this array.
-// wso2ctl.ts never needs to change.
+// crectl.ts never needs to change.
 export const commands = [status, stop, stopAll, jvm, containers, usage, ports, dump, inspect, list];

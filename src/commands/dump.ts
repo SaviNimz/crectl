@@ -131,7 +131,7 @@ async function captureInto(outputDir: string, target: WSO2Process, plan: DumpPla
 
   // Start the flight recording first so thread dumps and the heap dump happen while it records.
   const jfrFile = path.join(outputDir, 'recording.jfr');
-  const jfrRecordingName = `wso2ctl-${target.pid}`;
+  const jfrRecordingName = `crectl-${target.pid}`;
   const jfrEndsAt = Date.now() + jfrSeconds * 1000;
   if (jfrSeconds > 0) {
     runJcmd(jcmdPath, target.pid, ['JFR.start', `name=${jfrRecordingName}`, `duration=${jfrSeconds}s`, `filename=${jfrFile}`]);
@@ -178,7 +178,7 @@ function register(program: Command): void {
     .option('--interval <seconds>', 'seconds between thread dumps', '5')
     .option('--heap', 'also take a heap dump (pauses the JVM while it runs)')
     .option('--jfr <seconds>', 'also record a Java Flight Recording for this many seconds')
-    .option('--out <dir>', 'parent directory for the dump folder', './wso2ctl-dumps')
+    .option('--out <dir>', 'parent directory for the dump folder', './crectl-dumps')
     .action(async (target: string, opts) => {
       try {
         const plan = buildDumpPlan(opts);
