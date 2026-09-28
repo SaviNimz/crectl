@@ -30,15 +30,22 @@ wso2ctl list
 
 `wso2ctl jvm use` switches your JDK by repointing a symlink at `~/.wso2ctl/java`.
 A CLI can't change your parent shell's environment, so point `JAVA_HOME` at that
-symlink once in `~/.zshrc`:
+symlink once. Add these lines to your shell profile (`~/.zshrc` by default on macOS):
 
 ```sh
 export JAVA_HOME="$HOME/.wso2ctl/java"
 export PATH="$JAVA_HOME/bin:$PATH"
 ```
 
-Then run `source ~/.zshrc` or open a new terminal. Run `wso2ctl jvm use <version>` at
-least once so the symlink exists.
+Put them at the **end** of the file. If the profile already sets `JAVA_HOME` (for example
+with `/usr/libexec/java_home`, SDKMAN, or jenv), a later line wins, so wso2ctl's lines need to
+come last.
+
+Before opening a new terminal, run `wso2ctl jvm use <version>` with the JDK you use today, so
+the symlink exists and nothing changes for you. `jvm use` warns you if the shell you ran it
+from isn't set up this way.
+
+This is opt-in. Until you add these lines, `wso2ctl jvm` doesn't affect your shell at all.
 
 ---
 
@@ -117,21 +124,66 @@ that are still holding ports and causing `Address already in use` on the next st
 
 ### `wso2ctl jvm list` / `wso2ctl jvm use <version>` (macOS)
 
-Lists installed JDKs and switches the global one.
+Lists installed JDKs and switches the global one. **If the JDK you ask for isn't
+installed, `jvm use` downloads it for you.**
 
 ```sh
-wso2ctl jvm list       # '*' marks the active JDK
-wso2ctl jvm use 11
-wso2ctl jvm use 17
+wso2ctl jvm list              # '*' marks the active JDK
+wso2ctl jvm use 11            # newest installed JDK 11; downloads Temurin 11 if there is none
+wso2ctl jvm use 8             # "8" and "1.8" both mean Java 8
+wso2ctl jvm use 17.0.20       # an exact installed version
+wso2ctl jvm use 21 --no-install   # fail instead of downloading
 ```
 
-The command uses `/usr/libexec/java_home` to find JDKs. See the
-[one-time setup](#one-time-setup-for-jdk-switching-optional) above.
+How it works:
+
+1. **Use what's already installed.** It looks for JDKs everywhere they're commonly
+   installed on a Mac:
+   - JDKs registered with macOS (`/usr/libexec/java_home -V`): installers, `brew install --cask`, IntelliJ downloads
+   - SDKMAN (`~/.sdkman/candidates/java`)
+   - asdf (`~/.asdf/installs/java`)
+   - mise (`~/.local/share/mise/installs/java`)
+   - jenv (`~/.jenv/versions`)
+   - Homebrew formulae (`openjdk`, `openjdk@17`, …), including ones not linked into `/Library/Java`
+
+   It picks the newest JDK with the **same major version**, preferring one built for your
+   Mac's CPU. (It doesn't use `java_home -v 11`, which treats the version as a minimum and
+   returns a newer JDK when 11 isn't installed.) `jvm list` shows where each JDK was found.
+2. **Install only if it's missing.** It downloads the latest
+   [Eclipse Temurin](https://adoptium.net) build of that major version from the Adoptium API,
+   **verifies its SHA-256 checksum**, and unpacks it to
+   `~/Library/Java/JavaVirtualMachines/temurin-<major>.jdk`. That's a per-user folder macOS
+   already scans, so **no sudo is needed**, and your IDE and other tools see it like any other
+   JDK. On Apple Silicon, Java 8 (which has no ARM build) is installed as the Intel build and
+   runs under Rosetta.
+3. **Switch.** It repoints `~/.wso2ctl/java` at the chosen JDK. Because `JAVA_HOME` points at
+   that symlink, every terminal set up as described in the
+   [one-time setup](#one-time-setup-for-jdk-switching-optional) switches at once, including
+   terminals that are already open.
+
+**What it never touches:** existing JDKs, `/Library/Java`, your shell profile, or other
+version managers' settings. It only writes the `~/.wso2ctl/java` symlink and, when a JDK is
+missing, a new `temurin-<major>.jdk` folder (it refuses to overwrite one that already exists).
+
+**macOS's default Java is protected.** macOS treats the newest registered JDK as the system
+default (`/usr/bin/java`, and `java_home` with no `-v`). If the JDK being downloaded would be
+newer than every JDK you have, and so would change that default, `jvm use` asks before installing.
+When input isn't interactive it stops unless you pass `--yes`.
+
+| Flag | Effect |
+|---|---|
+| `--no-install` | Never download. Fail if the JDK isn't installed. |
+| `-y, --yes` | Install without asking, even if the new JDK would become macOS's default |
+
+To remove a JDK that wso2ctl installed: `rm -rf ~/Library/Java/JavaVirtualMachines/temurin-<major>.jdk`.
+
+A server that's already running keeps the JDK it started with. Restart it to pick up the
+switch, then check it with `wso2ctl inspect <target>`.
 
 **Debugging use:** customers run many different product and JDK combinations
 (e.g. APIM 3.2.0 on JDK 8/11, APIM 4.x on JDK 11/17/21). Matching the customer's JDK is often
-the difference between reproducing the issue and not. New terminals pick up the
-switch immediately.
+the difference between reproducing the issue and not. With auto-install, matching it is one command,
+even on a fresh laptop.
 
 ### `wso2ctl containers`
 
@@ -188,8 +240,7 @@ HTTPS, gateway HTTP/S, WebSocket, WebSub, Thrift, JMS, JMX, and so on). Ports th
 WSO2 ports, such as a remote debug agent, are listed separately.
 
 With `--offset`, any port that's taken shows **who holds it** (PID and process name). That
-includes processes owned by other users, which `lsof` can't see without sudo. For example,
-macOS `launchd` listens on 8021, which clashes with API-M 4.x's WebSub HTTPS port at offset 0.
+includes system services and other users' processes, which `lsof` can't see without sudo.
 
 **Debugging use:** stop guessing offsets. Before starting a second or third pack for a repro,
 `--suggest` gives you an offset that works first time, so you don't get a half-started server
@@ -243,7 +294,7 @@ A one-screen summary of a pack's setup. `<target>` can be a **pack directory (ru
 not)**, a PID, or a name match.
 
 ```sh
-wso2ctl inspect ~/cases/CS0012345/wso2am-4.3.0   # any extracted pack
+wso2ctl inspect ~/cases/my-case/wso2am-4.3.0     # any extracted pack
 wso2ctl inspect 4.3.0                            # a running instance
 wso2ctl inspect 48213 --json
 ```
