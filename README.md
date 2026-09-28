@@ -1,6 +1,6 @@
 # wso2ctl
 
-A small CLI for seeing and controlling the WSO2 products running on your machine. This is built for **CRE engineers doing local debugging**.
+A CLI tool for testing and controlling the WSO2 products running on your machine. This is built for **CRE engineers doing local debugging**.
 ---
 
 ## Quick install
