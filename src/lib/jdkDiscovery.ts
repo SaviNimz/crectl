@@ -57,7 +57,7 @@ function listMacOsJdks(): JdkInfo[] {
  * Reads a JDK's `release` file (every JDK ships one), which records its
  * version and CPU architecture without having to run it.
  */
-function readJdkReleaseFile(jdkHome: string, source: string): JdkInfo | null {
+export function readJdkReleaseFile(jdkHome: string, source: string): JdkInfo | null {
   let releaseText: string;
   try {
     releaseText = fs.readFileSync(path.join(jdkHome, 'release'), 'utf8');

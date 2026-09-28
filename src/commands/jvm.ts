@@ -11,7 +11,8 @@ import {
 } from '../lib/jvmManager.js';
 import { listJdks, getMacOsDefaultJdk, parseFeatureVersion, compareJavaVersions } from '../lib/jdkDiscovery.js';
 import { findTemurinRelease, installTemurin, USER_JVM_DIR, type TemurinRelease } from '../lib/jdkInstaller.js';
-import { formatBytes, printTable } from '../lib/format.js';
+import { getJavaEnvironment, type JdkLocation } from '../lib/javaEnvironment.js';
+import { formatBytes, printSection, printTable } from '../lib/format.js';
 
 /** Prints download progress in place on a terminal, or in 25% steps when output is piped. */
 function createProgressReporter(): { update: (percent: number) => void; finish: () => void } {
@@ -103,6 +104,35 @@ function printShellSetupStatus(): void {
   console.log('    export PATH="$JAVA_HOME/bin:$PATH"');
 }
 
+/** "17.0.20  /Library/Java/.../Home", adding "(via <symlink>)" when the configured path is a link. */
+function describeLocation(location: JdkLocation | null, whenMissing: string): string {
+  if (!location) return whenMissing;
+  const version = location.version ?? 'unknown version';
+  const viaLink = location.resolvedPath !== location.path ? `\n(via ${location.path})` : '';
+  return `${version}  ${location.resolvedPath}${viaLink}`;
+}
+
+function printJavaEnvironment(): void {
+  const { shell, wso2ctlGlobal, macOsDefault } = getJavaEnvironment();
+
+  printSection('This shell', [
+    ['JAVA_HOME', describeLocation(shell.javaHome, 'not set')],
+    ['java on PATH', describeLocation(shell.javaOnPath, 'none found')],
+    ['Follows wso2ctl', shell.followsWso2ctl ? 'yes — changes with "wso2ctl jvm use"' : 'no — JAVA_HOME is not ~/.wso2ctl/java'],
+  ]);
+  printSection('wso2ctl global (jvm use)', [['JDK', describeLocation(wso2ctlGlobal, 'not set — run "wso2ctl jvm use <version>"')]]);
+  printSection('macOS default (/usr/bin/java)', [['JDK', describeLocation(macOsDefault, 'none registered')]]);
+
+  const javaHomeVersion = shell.javaHome?.version;
+  const pathVersion = shell.javaOnPath?.version;
+  if (javaHomeVersion && pathVersion && javaHomeVersion !== pathVersion) {
+    console.log(`\n⚠ "java" on PATH is ${pathVersion} but JAVA_HOME is ${javaHomeVersion}. Tools that read JAVA_HOME`);
+    console.log('  (WSO2 startup scripts, Maven) and ones that just run "java" will use different JDKs.');
+    console.log('  Put "$JAVA_HOME/bin" first on PATH in your shell profile to line them up.');
+  }
+  console.log('');
+}
+
 function reportFailure(err: unknown): void {
   console.error((err as Error).message);
   process.exitCode = 1;
@@ -127,6 +157,23 @@ function register(program: Command): void {
           ['VERSION', 'ACTIVE', 'ARCH', 'SOURCE', 'PATH'],
           jdks.map((jdk) => [jdk.version, jdk.path === activeJdkPath ? '*' : '', jdk.architecture, jdk.source, jdk.path])
         );
+      } catch (err) {
+        reportFailure(err);
+      }
+    });
+
+  jvm
+    .command('current')
+    .description('Show the active JVM: in this shell, the wso2ctl global one, and the macOS default')
+    .option('--json', 'output as JSON')
+    .action((opts) => {
+      try {
+        assertMac();
+        if (opts.json) {
+          console.log(JSON.stringify(getJavaEnvironment(), null, 2));
+          return;
+        }
+        printJavaEnvironment();
       } catch (err) {
         reportFailure(err);
       }

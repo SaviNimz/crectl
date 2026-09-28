@@ -122,20 +122,33 @@ Takes the same flags as `stop`: `-y`, `--force`, `--dry-run`, and `--timeout`.
 **Debugging use:** get to a clean state between repros, and clear out leftover instances
 that are still holding ports and causing `Address already in use` on the next startup.
 
-### `wso2ctl jvm list` / `wso2ctl jvm use <version>` (macOS)
+### `wso2ctl jvm list` / `jvm current` / `jvm use <version>` (macOS)
 
 Lists installed JDKs and switches the global one. **If the JDK you ask for isn't
 installed, `jvm use` downloads it for you.**
 
 ```sh
 wso2ctl jvm list              # '*' marks the active JDK
+wso2ctl jvm current           # which JVM this shell, wso2ctl, and macOS are using
 wso2ctl jvm use 11            # newest installed JDK 11; downloads Temurin 11 if there is none
 wso2ctl jvm use 8             # "8" and "1.8" both mean Java 8
 wso2ctl jvm use 17.0.20       # an exact installed version
 wso2ctl jvm use 21 --no-install   # fail instead of downloading
 ```
 
-How it works:
+`jvm current` shows the JVM in effect at each level:
+
+| Level | What it shows |
+|---|---|
+| This shell | `JAVA_HOME`, and the `java` you get when you type `java` (both resolved through symlinks, with versions), plus whether the shell follows `wso2ctl jvm use` |
+| wso2ctl global | The JDK `~/.wso2ctl/java` points at, i.e. the last `jvm use` |
+| macOS default | The JDK behind `/usr/bin/java` and `java_home` with no `-v` |
+
+It warns when `java` on `PATH` and `JAVA_HOME` are different JDKs. That's a common cause of
+"it works in my terminal but the server starts on the wrong Java", because WSO2 startup
+scripts use `JAVA_HOME`. Use `--json` for scripts.
+
+How `jvm use` works:
 
 1. **Use what's already installed.** It looks for JDKs everywhere they're commonly
    installed on a Mac:
