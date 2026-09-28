@@ -1,0 +1,28 @@
+{
+  "name": "wso2-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Extensible CLI toolkit for managing local WSO2 product instances",
+  "bin": {
+    "wso2ctl": "./dist/bin/wso2ctl.js",
+    "wso2-status": "./dist/bin/wso2-status.js",
+    "wso2-stop-all": "./dist/bin/wso2-stop-all.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/bin/*.js",
+    "dev": "tsc --watch"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/prompts": "^2.4.9",
+    "typescript": "^5.5.0"
+  }
+}
