@@ -9,7 +9,9 @@ import type { WSO2Process } from '../types.js';
 // the script names too would also pick up the `sh wso2server.sh` launcher shell
 // that sits in front of each JVM, and a bare "wso2" substring would match
 // unrelated paths (e.g. this tool's own install directory).
-const CARBON_HOME_FLAG = /-Dcarbon\.home=(\S+)/;
+// The path is taken up to the next ` -<flag>` rather than the first space, since
+// ps prints it unquoted and pack folders often live under paths like "WSO2 Products/".
+const CARBON_HOME_FLAG = /-Dcarbon\.home=(.+?)(?=\s+-\S|\s*$)/;
 
 /** Scans running processes for WSO2 Carbon-based product instances. */
 export function scanWso2Processes(): WSO2Process[] {

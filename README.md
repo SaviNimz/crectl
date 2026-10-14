@@ -1,366 +1,466 @@
 # crectl
 
-A CLI tool for testing and controlling the WSO2 products running on your machine. This is built for **CRE engineers doing local debugging**.
----
+`crectl` is a command-line tool for managing and debugging WSO2 products running locally.
 
-## Quick install
+It is mainly intended for CRE engineers who need to run multiple WSO2 products, reproduce issues, inspect configurations, switch JDKs, check ports and resource usage, and collect diagnostic data.
 
-**Requirements:** Node.js 18+ and macOS.
+## Installation
 
-```sh
+### Requirements
+
+- macOS
+- Node.js 18+
+
+```bash
 git clone https://github.com/SaviNimz/crectl.git
 cd crectl
+
 npm install
 npm run build
 npm link
 ```
 
-Verify with:
+Verify the installation:
 
-```sh
+```bash
 crectl --version
 crectl list
 ```
 
-**To update:** `git pull && npm install && npm run build`. The link picks up the new build automatically.
+### Update
 
-**To uninstall:** `npm unlink -g crectl`.
-
-### One-time setup for JDK switching (optional)
-
-`crectl jvm use` switches your JDK by repointing a symlink at `~/.crectl/java`.
-A CLI can't change your parent shell's environment, so point `JAVA_HOME` at that
-symlink once. Add these lines to your shell profile (`~/.zshrc` by default on macOS):
-
-```sh
-export JAVA_HOME="$HOME/.crectl/java"
-export PATH="$JAVA_HOME/bin:$PATH"
+```bash
+git pull
+npm install
+npm run build
 ```
 
-Put them at the **end** of the file. If the profile already sets `JAVA_HOME` (for example
-with `/usr/libexec/java_home`, SDKMAN, or jenv), a later line wins, so crectl's lines need to
-come last.
+### Uninstall
 
-Before opening a new terminal, run `crectl jvm use <version>` with the JDK you use today, so
-the symlink exists and nothing changes for you. `jvm use` warns you if the shell you ran it
-from isn't set up this way.
-
-This is opt-in. Until you add these lines, `crectl jvm` doesn't affect your shell at all.
+```bash
+npm unlink -g crectl
+```
 
 ---
 
 ## Commands
 
-Run `crectl <command> --help` at any time to see all flags.
+Run:
 
-### `crectl status`
+```bash
+crectl <command> --help
+```
 
-Lists every WSO2 product running natively on the machine.
+to see the available options for any command.
 
-```sh
+| Command | Purpose |
+|---|---|
+| `crectl status` | Show running WSO2 products |
+| `crectl inspect <target>` | Inspect a product installation or running instance |
+| `crectl usage` | Show CPU and memory usage |
+| `crectl ports` | Inspect ports and find free port offsets |
+| `crectl stop <target>` | Stop a WSO2 product |
+| `crectl stop-all` | Stop all running WSO2 products |
+| `crectl dump <target>` | Capture thread dumps, heap dumps, or JFR recordings |
+| `crectl jvm list` | List installed JDKs |
+| `crectl jvm current` | Show the currently active JDK |
+| `crectl jvm use <version>` | Switch to another JDK |
+| `crectl containers` | Show WSO2 Docker containers |
+| `crectl list` | List all available commands |
+
+`<target>` can usually be a PID, product/version name, or another matching identifier.
+
+---
+
+## Status
+
+Show all WSO2 products currently running on the machine:
+
+```bash
+crectl status
+```
+
+Example:
+
+```bash
 crectl status
 crectl status --json
-crectl-status            # shortcut
 ```
 
-| Column | Meaning |
-|---|---|
-| `PID` | Process ID. Pass it to `stop`, `jstack`, `jcmd`, etc. |
-| `PRODUCT` / `VERSION` | Resolved from the `CARBON_HOME` folder name (e.g. `wso2am-4.2.0` → API Manager 4.2.0) |
-| `UPTIME` | How long the instance has been up |
-| `ADMIN` / `PUBLISHER` / `DEVPORTAL` | Portal URLs for API Manager, using the **actual** listening port, so `-DportOffset` is taken into account. 3.x packs show `/store` instead of `/devportal`, and no Admin portal. |
-| `CARBON_HOME` | The pack directory, so you know exactly which extracted copy is running |
+The output includes information such as:
 
-**Debugging use:** run this first on any repro. It shows which pack and which copy is
-actually running, and gives you clickable portal URLs even when you've set offsets on
-several instances. Use `--json` to pipe the output into `jq` or scripts.
+- PID
+- product and version
+- uptime
+- `CARBON_HOME`
+- API Manager portal URLs
+- effective ports and port offsets
 
-A product is detected by the `-Dcarbon.home=` flag its startup script passes to the JVM, so
-the `sh wso2server.sh` launcher shell in front of it isn't listed. Supported products include API Manager,
-Identity Server (and IS-as-KM), the API-M 4.5+ distributions (API Control Plane, Universal
-Gateway, Traffic Manager), EI, MI, SI, SP, ESB, DAS, and IoT Server.
+This is usually the first command to run when debugging a local setup.
 
-### `crectl stop <target>`
+---
 
-Stops a single product. `<target>` is either a **PID** or a **text match** against the
-product name, version, or `CARBON_HOME` path.
+## Inspect a Product
 
-```sh
-crectl stop 48213            # by PID
-crectl stop 4.2.0            # by version
-crectl stop "Identity"       # by product name
-crectl stop am --dry-run     # show what would stop, do nothing
-crectl stop am -y --force    # no prompt, immediate SIGKILL
+`inspect` provides a summary of a WSO2 installation.
+
+You can inspect either an extracted pack or a running instance:
+
+```bash
+crectl inspect ~/cases/wso2am-4.3.0
+crectl inspect 4.3.0
+crectl inspect 48213
 ```
 
-| Flag | Effect |
-|---|---|
-| `-y, --yes` | Skip the confirmation prompt |
-| `--force` | Send SIGKILL immediately instead of shutting down gracefully |
-| `--dry-run` | Only show what would be stopped |
-| `--timeout <s>` | Seconds to wait after SIGTERM before escalating to SIGKILL (default `15`) |
+It can show information including:
 
-If more than one instance matches, you get an interactive picker. By default the
-command sends SIGTERM, waits, and then sends SIGKILL if the process is still alive.
+- product and version
+- WSO2 update level
+- JDK version and path
+- JVM memory settings
+- port offset
+- `deployment.toml`
+- databases and key managers
+- gateway environments
+- keystores and certificate expiry
+- custom JARs and extensions
 
-**Debugging use:** restart one pack after a config change (for example, editing
-`deployment.toml`) without touching the others running alongside it.
+Sensitive datasource passwords are masked.
 
-### `crectl stop-all`
+This is useful when checking whether a local reproduction environment matches another environment.
 
-Stops every running WSO2 product. It shows a table first and asks for confirmation.
+---
 
-```sh
+## CPU and Memory Usage
+
+```bash
+crectl usage
+crectl usage --sort mem
+```
+
+Shows resource usage for WSO2 processes and containers.
+
+Use it to quickly identify a process consuming high CPU or memory before collecting diagnostic data.
+
+---
+
+## Port Checking
+
+Show the ports used by running WSO2 products:
+
+```bash
+crectl ports
+```
+
+Check whether a specific port offset is available:
+
+```bash
+crectl ports --offset 3
+```
+
+Find the lowest available offset:
+
+```bash
+crectl ports --suggest
+```
+
+Specify another product when required:
+
+```bash
+crectl ports --suggest --product mi
+crectl ports --offset 5 --product is
+```
+
+Supported product identifiers include:
+
+```text
+am
+acp
+gw
+tm
+is
+mi
+```
+
+This is useful when running multiple WSO2 products locally without manually checking for port conflicts.
+
+---
+
+## Stop Products
+
+Stop a single product:
+
+```bash
+crectl stop 48213
+crectl stop 4.2.0
+crectl stop "Identity"
+```
+
+Preview what would be stopped:
+
+```bash
+crectl stop am --dry-run
+```
+
+Stop without confirmation:
+
+```bash
+crectl stop am -y
+```
+
+Force termination:
+
+```bash
+crectl stop am --force
+```
+
+Stop every running WSO2 product:
+
+```bash
 crectl stop-all
-crectl stop-all --dry-run
-crectl stop-all -y
-crectl-stop-all          # shortcut
 ```
 
-Takes the same flags as `stop`: `-y`, `--force`, `--dry-run`, and `--timeout`.
+Useful options:
 
-**Debugging use:** get to a clean state between repros, and clear out leftover instances
-that are still holding ports and causing `Address already in use` on the next startup.
-
-### `crectl jvm list` / `jvm current` / `jvm use <version>` (macOS)
-
-Lists installed JDKs and switches the global one. **If the JDK you ask for isn't
-installed, `jvm use` downloads it for you.**
-
-```sh
-crectl jvm list              # '*' marks the active JDK
-crectl jvm current           # which JVM this shell, crectl, and macOS are using
-crectl jvm use 11            # newest installed JDK 11; downloads Temurin 11 if there is none
-crectl jvm use 8             # "8" and "1.8" both mean Java 8
-crectl jvm use 17.0.20       # an exact installed version
-crectl jvm use 21 --no-install   # fail instead of downloading
+```text
+-y, --yes       Skip confirmation
+--force         Force termination
+--dry-run       Show what would be stopped
+--timeout <s>   Wait before forcing termination
 ```
 
-`jvm current` shows the JVM in effect at each level:
+---
 
-| Level | What it shows |
-|---|---|
-| This shell | `JAVA_HOME`, and the `java` you get when you type `java` (both resolved through symlinks, with versions), plus whether the shell follows `crectl jvm use` |
-| crectl global | The JDK `~/.crectl/java` points at, i.e. the last `jvm use` |
-| macOS default | The JDK behind `/usr/bin/java` and `java_home` with no `-v` |
+## Diagnostic Dumps
 
-It warns when `java` on `PATH` and `JAVA_HOME` are different JDKs. That's a common cause of
-"it works in my terminal but the server starts on the wrong Java", because WSO2 startup
-scripts use `JAVA_HOME`. Use `--json` for scripts.
+`crectl dump` collects diagnostic information from a running WSO2 product.
 
-How `jvm use` works:
+### Thread dumps
 
-1. **Use what's already installed.** It looks for JDKs everywhere they're commonly
-   installed on a Mac:
-   - JDKs registered with macOS (`/usr/libexec/java_home -V`): installers, `brew install --cask`, IntelliJ downloads
-   - SDKMAN (`~/.sdkman/candidates/java`)
-   - asdf (`~/.asdf/installs/java`)
-   - mise (`~/.local/share/mise/installs/java`)
-   - jenv (`~/.jenv/versions`)
-   - Homebrew formulae (`openjdk`, `openjdk@17`, …), including ones not linked into `/Library/Java`
+By default, three thread dumps are captured five seconds apart:
 
-   It picks the newest JDK with the **same major version**, preferring one built for your
-   Mac's CPU. (It doesn't use `java_home -v 11`, which treats the version as a minimum and
-   returns a newer JDK when 11 isn't installed.) `jvm list` shows where each JDK was found.
-2. **Install only if it's missing.** It downloads the latest
-   [Eclipse Temurin](https://adoptium.net) build of that major version from the Adoptium API,
-   **verifies its SHA-256 checksum**, and unpacks it to
-   `~/Library/Java/JavaVirtualMachines/temurin-<major>.jdk`. That's a per-user folder macOS
-   already scans, so **no sudo is needed**, and your IDE and other tools see it like any other
-   JDK. On Apple Silicon, Java 8 (which has no ARM build) is installed as the Intel build and
-   runs under Rosetta.
-3. **Switch.** It repoints `~/.crectl/java` at the chosen JDK. Because `JAVA_HOME` points at
-   that symlink, every terminal set up as described in the
-   [one-time setup](#one-time-setup-for-jdk-switching-optional) switches at once, including
-   terminals that are already open.
+```bash
+crectl dump 4.3.0
+```
 
-**What it never touches:** existing JDKs, `/Library/Java`, your shell profile, or other
-version managers' settings. It only writes the `~/.crectl/java` symlink and, when a JDK is
-missing, a new `temurin-<major>.jdk` folder (it refuses to overwrite one that already exists).
+Change the count and interval:
 
-**macOS's default Java is protected.** macOS treats the newest registered JDK as the system
-default (`/usr/bin/java`, and `java_home` with no `-v`). If the JDK being downloaded would be
-newer than every JDK you have, and so would change that default, `jvm use` asks before installing.
-When input isn't interactive it stops unless you pass `--yes`.
+```bash
+crectl dump 48213 --threads 5 --interval 10
+```
 
-| Flag | Effect |
-|---|---|
-| `--no-install` | Never download. Fail if the JDK isn't installed. |
-| `-y, --yes` | Install without asking, even if the new JDK would become macOS's default |
+### Heap dump
 
-To remove a JDK that crectl installed: `rm -rf ~/Library/Java/JavaVirtualMachines/temurin-<major>.jdk`.
+```bash
+crectl dump am --heap
+```
 
-A server that's already running keeps the JDK it started with. Restart it to pick up the
-switch, then check it with `crectl inspect <target>`.
+### Java Flight Recording
 
-**Debugging use:** customers run many different product and JDK combinations
-(e.g. APIM 3.2.0 on JDK 8/11, APIM 4.x on JDK 11/17/21). Matching the customer's JDK is often
-the difference between reproducing the issue and not. With auto-install, matching it is one command,
-even on a fresh laptop.
+```bash
+crectl dump am --jfr 60
+```
 
-### `crectl containers`
+### Heap dump only
 
-Lists Docker containers whose image or name contains `wso2`.
+```bash
+crectl dump am --threads 0 --heap
+```
 
-```sh
+Output is stored under:
+
+```text
+./crectl-dumps/<product>-pid<PID>-<timestamp>/
+```
+
+Depending on the options used, the directory can contain:
+
+```text
+process-info.txt
+thread-dump-1.txt
+thread-dump-2.txt
+thread-dump-3.txt
+heap-dump.hprof
+recording.jfr
+```
+
+`crectl` uses tools from the same JDK as the running server where possible, avoiding common JDK mismatch issues when attaching diagnostic tools.
+
+---
+
+## JDK Management
+
+### List installed JDKs
+
+```bash
+crectl jvm list
+```
+
+### Check the current JDK
+
+```bash
+crectl jvm current
+```
+
+### Switch JDK
+
+```bash
+crectl jvm use 11
+crectl jvm use 17
+crectl jvm use 21
+```
+
+An exact installed version can also be selected:
+
+```bash
+crectl jvm use 17.0.20
+```
+
+If the requested major version is not installed, `crectl` can download an Eclipse Temurin JDK automatically.
+
+To prevent automatic installation:
+
+```bash
+crectl jvm use 11 --no-install
+```
+
+### One-time shell setup
+
+JDK switching works through:
+
+```text
+~/.crectl/java
+```
+
+To make your shell follow the JDK selected by `crectl`, add the following to the **end** of your shell profile, such as `~/.zshrc`:
+
+```bash
+export JAVA_HOME="$HOME/.crectl/java"
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
+Before reloading the shell, select the JDK you currently use:
+
+```bash
+crectl jvm use <version>
+```
+
+For example:
+
+```bash
+crectl jvm use 17
+```
+
+A WSO2 server that is already running continues using the JDK it started with. Restart the server after switching JDKs.
+
+---
+
+## Docker Containers
+
+Show running WSO2 containers:
+
+```bash
 crectl containers
-crectl containers --all     # include stopped containers
+```
+
+Include stopped containers:
+
+```bash
+crectl containers --all
+```
+
+Machine-readable output:
+
+```bash
 crectl containers --json
 ```
 
-**Debugging use:** see the Docker-based parts of a setup (such as a Docker Compose
-deployment, or a DB/KM running in a container) next to your native packs, including
-their port mappings. If Docker isn't running, the command skips the check instead of failing.
+If Docker is not running, the command skips the Docker check rather than failing.
 
-### `crectl usage`
+---
 
-Shows CPU and memory for every WSO2 product, both native processes and containers, in one table.
+## Typical Debugging Workflow
 
-```sh
-crectl usage              # sorted by CPU
-crectl usage --sort mem   # sorted by memory
-crectl usage --json
+A common local reproduction workflow looks like this:
+
+```bash
+# Check the product setup
+crectl inspect ./wso2am-4.2.0
+
+# Stop old instances
+crectl stop-all -y
+
+# Match the required Java version
+crectl jvm use 11
+
+# Find a free port offset
+crectl ports --suggest
+
+# Start the required WSO2 product
+
+# Confirm the running instance
+crectl status
+
+# Monitor CPU and memory
+crectl usage --sort mem
+
+# Capture diagnostics while reproducing the issue
+crectl dump 4.2.0 --jfr 60
+
+# Stop or restart the product when needed
+crectl stop 4.2.0
 ```
 
-**Debugging use:** quickly spot the pack that's spinning a CPU or slowly using up
-memory before you take a thread dump or heap dump. Get the PID here, then run
-`jstack <pid>` or `jcmd <pid> GC.heap_dump`.
+---
 
-### `crectl ports`
+## JSON Output
 
-Shows which ports each running product uses, and checks whether an offset is free
-*before* you start another pack.
+Several commands support `--json` for scripting and automation:
 
-```sh
-crectl ports                          # ports of every running product
-crectl ports --offset 3               # are API Manager's ports free at offset 3?
-crectl ports --offset 12 --product mi # same check for Micro Integrator
-crectl ports --suggest                # lowest free offset for API Manager
-crectl ports --suggest --product is   # ... for Identity Server
-```
-
-| Flag | Effect |
-|---|---|
-| `--offset <n>` | Check every port the product would bind at this offset. Exits `1` if any are taken. |
-| `--suggest` | Find the lowest offset where all the product's ports are free, and print the config to use |
-| `--product <name>` | Product to check with `--offset`/`--suggest`: `am` (default), `acp`, `gw`, `tm`, `is`, `mi` |
-| `--json` | Machine-readable output |
-
-With no flags, each running instance is listed with its offset and where the offset came from
-(a `-DportOffset` flag, `[server] offset` in `deployment.toml`, or the product default). Each
-expected port is shown as `listening` or `NOT LISTENING`, next to what it's for (management
-HTTPS, gateway HTTP/S, WebSocket, WebSub, Thrift, JMS, JMX, and so on). Ports that aren't standard
-WSO2 ports, such as a remote debug agent, are listed separately.
-
-With `--offset`, any port that's taken shows **who holds it** (PID and process name). That
-includes system services and other users' processes, which `lsof` can't see without sudo.
-
-**Debugging use:** stop guessing offsets. Before starting a second or third pack for a repro,
-`--suggest` gives you an offset that works first time, so you don't get a half-started server
-with `Address already in use` buried in the log. When a server starts but something doesn't
-respond, `crectl ports` shows which listener never came up.
-
-> Micro Integrator has a built-in offset of 10 (HTTP 8290, Management API 9164), so its offsets
-> start at 10.
-
-### `crectl dump <target>`
-
-Captures thread dumps, a heap dump, and/or a Java Flight Recording from a running product,
-all in one timestamped folder. `<target>` works like `stop`: a PID or a name match.
-
-```sh
-crectl dump 4.3.0                        # 3 thread dumps, 5s apart (the usual support ask)
-crectl dump 48213 --threads 5 --interval 10
-crectl dump am --heap                    # thread dumps + heap dump
-crectl dump am --jfr 60                  # thread dumps while a 60s JFR recording runs
-crectl dump am --threads 0 --heap        # heap dump only
-```
-
-| Flag | Effect |
-|---|---|
-| `--threads <count>` | Number of thread dumps (default `3`; `0` to skip) |
-| `--interval <s>` | Seconds between thread dumps (default `5`) |
-| `--heap` | Also take a heap dump (`.hprof`). The JVM pauses while it's written, and the file is roughly the size of the used heap. |
-| `--jfr <s>` | Also record a JFR for this many seconds. It starts first, so the thread dumps are taken while it records. |
-| `--out <dir>` | Parent folder for the dumps (default `./crectl-dumps`) |
-
-Output goes to `<out>/<pack>-pid<PID>-<timestamp>/`:
-
-```
-process-info.txt     product, PID, CARBON_HOME, full JVM command line
-thread-dump-1..N.txt jcmd Thread.print -l (includes lock info)
-thread-cpu-1..N.txt  per-thread CPU from top -H (Linux only), to match against the nid in each dump
-heap-dump.hprof      with --heap
-recording.jfr        with --jfr (open in JDK Mission Control)
-```
-
-`jcmd` is taken from **the same JDK the server is running on**, so you won't get attach
-errors from a mismatched JDK on your PATH.
-
-**Debugging use:** when you reproduce a hang, a CPU spike, or a slow API, capture the same
-evidence support asks customers for, with one command, before the moment passes. Pair it
-with `crectl usage` to find the busy pack first.
-
-### `crectl inspect <target>`
-
-A one-screen summary of a pack's setup. `<target>` can be a **pack directory (running or
-not)**, a PID, or a name match.
-
-```sh
-crectl inspect ~/cases/my-case/wso2am-4.3.0     # any extracted pack
-crectl inspect 4.3.0                            # a running instance
+```bash
+crectl status --json
 crectl inspect 48213 --json
+crectl usage --json
+crectl containers --json
 ```
 
-| Section | What it shows |
-|---|---|
-| Product | Product, version, location, and the **update level** recorded by the WSO2 Updates 2.0 tool |
-| Runtime | Running or not, PID, uptime, **JDK version and path**, `-Xms`/`-Xmx`. For a stopped pack, the JDK `JAVA_HOME` would start it with. |
-| Ports | Effective port offset (and where it came from) and the primary port |
-| Configuration | `deployment.toml` path, key manager (resident or external), datasources (type, user, JDBC URL with passwords masked), gateway environments |
-| Keystores | Primary and TLS keystores and the truststore: entry count and **certificate expiry**, with a warning if the certificate has expired or expires within 30 days. Handles `.jks` and `.p12`, and passwords set via `$env{}`. Secure Vault (`$secret{}`) passwords are reported but not decrypted. |
-| Extensions | Jars in `components/lib` and `dropins` (auto-generated OSGi bundles hidden), and WUM patches |
+For example:
 
-**Debugging use:** when you pick up a case or reuse an old repro pack, see immediately whether it
-matches what the customer runs: the same update level, JDK, database type, and custom jars.
-It also catches the classic "my local pack suddenly fails TLS" problem, because an expired
-default `wso2carbon` certificate is flagged as `CERTIFICATE HAS EXPIRED`.
+```bash
+crectl status --json | jq
+```
 
-### `crectl list`
+---
 
-Prints every available command, including any new ones you add, with a one-line description.
+## Development
 
-```sh
+Commands are located under:
+
+```text
+src/commands/
+```
+
+To add a command:
+
+1. Create `src/commands/<name>.ts`.
+2. Export a `register(program)` function.
+3. Register the command in `src/commands/index.ts`.
+4. Build the project.
+
+```bash
+npm run build
+```
+
+During development:
+
+```bash
+npm run dev
+```
+
+Use:
+
+```bash
 crectl list
 ```
 
----
-
-## Typical debugging session
-
-```sh
-crectl inspect ./wso2am-4.2.0 # check update level, DBs, jars against the customer's setup
-crectl stop-all -y            # clean slate
-crectl jvm use 11             # match the customer's JDK
-crectl ports --suggest        # pick a clash-free offset for the next pack
-# start the pack(s) you need
-crectl status                 # confirm what's up + grab portal URLs
-crectl usage --sort mem       # watch resource usage while reproducing
-crectl dump 4.2.0 --jfr 60    # capture evidence while the issue is happening
-crectl stop 4.2.0             # restart just one pack after a config change
-```
-
----
-
-## Adding a new command
-
-The CLI is built to be extended. To add a command:
-
-1. Create `src/commands/<name>.ts` exporting `{ register(program) }`. Copy any
-   existing command to see the shape.
-2. Add it to the array in `src/commands/index.ts`.
-3. Run `npm run build`.
-
-You don't need to change any other file. `crectl list` shows the new command automatically.
-
-Use `npm run dev` to rebuild automatically while you work.
+to confirm that the new command has been registered.
