@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { X509Certificate } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { getPackLayout } from './packLayout.js';
+import { getPackLayout, isGeneratedBundle } from './packLayout.js';
 import { readDeploymentConfig, getTomlString, getTomlValue, resolvePortOffset, type PortOffset, type TomlTable } from './deploymentConfig.js';
 import { resolveProduct } from './productMap.js';
 import { getPortProfile } from './productPorts.js';
@@ -12,7 +12,6 @@ import type { WSO2Process } from '../types.js';
 const DEFAULT_KEYSTORE_PASSWORD = 'wso2carbon';
 const DEFAULT_KEY_ALIAS = 'wso2carbon';
 const CERT_EXPIRY_WARNING_DAYS = 30;
-const GENERATED_BUNDLE_SUFFIX = /_1\.0\.0\.jar$/;
 
 export interface RuntimeInfo {
   running: boolean;
@@ -246,7 +245,6 @@ export function inspectPack(carbonHome: string, runningProcess: WSO2Process | nu
   const portProfile = getPortProfile(product, version);
   const portOffset = resolvePortOffset(carbonHome, runningProcess?.command ?? '', portProfile.defaultOffset);
   const isJar = (name: string) => name.endsWith('.jar');
-  const isGeneratedBundle = (name: string) => GENERATED_BUNDLE_SUFFIX.test(name);
   const dropinJars = listDirectoryEntries(layout.dropinsDir, isJar);
 
   return {

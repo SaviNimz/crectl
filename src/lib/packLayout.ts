@@ -39,3 +39,8 @@ export function getPackLayout(carbonHome: string): PackLayout {
 export function isWso2PackDirectory(dir: string): boolean {
   return fs.existsSync(path.join(dir, 'bin')) && fs.existsSync(getPackLayout(dir).deploymentToml);
 }
+
+/** Carbon wraps each plain jar in lib/ as an OSGi bundle in dropins/, named like foo_1.2.3_1.0.0.jar, and regenerates it on every start. */
+export function isGeneratedBundle(fileName: string): boolean {
+  return /_1\.0\.0\.jar$/.test(fileName);
+}

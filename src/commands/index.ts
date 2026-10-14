@@ -8,8 +8,9 @@ import ports from './ports.js';
 import dump from './dump.js';
 import inspect from './inspect.js';
 import logLevel from './logLevel.js';
+import updateDiff from './updateDiff.js';
 import list from './list.js';
 
 // Adding a new command: create the file above and add it to this array.
 // crectl.ts never needs to change.
-export const commands = [status, stop, stopAll, jvm, containers, usage, ports, dump, inspect, logLevel, list];
+export const commands = [status, stop, stopAll, jvm, containers, usage, ports, dump, inspect, logLevel, updateDiff, list];

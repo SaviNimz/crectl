@@ -63,6 +63,7 @@ to see the available options for any command.
 | `crectl stop-all` | Stop all running WSO2 products |
 | `crectl dump <target>` | Capture thread dumps, heap dumps, or JFR recordings |
 | `crectl log-level <target> [presets/loggers]` | Turn on debug logging without a restart, and undo it |
+| `crectl update-diff <target>` | Show which jars a U2 update changed |
 | `crectl jvm list` | List installed JDKs |
 | `crectl jvm current` | Show the currently active JDK |
 | `crectl jvm use <version>` | Switch to another JDK |
@@ -327,6 +328,51 @@ file byte-for-byte as it was. Remember to reset before handing a pack back or zi
 
 ---
 
+## Jars Changed by a U2 Update
+
+`crectl update-diff` (alias `u2-diff`) shows which jars and wars a U2 update changed. Before applying
+updates, the update tool (`bin/wso2update_<os>`) backs the whole pack up to `~/.wso2-updates/backup/` and
+records where in `updates/config.json`. This command compares the pack against that backup, so it only
+works on a pack that has been updated in place.
+
+```bash
+crectl update-diff ./wso2am-4.5.0
+crectl update-diff am --only upgraded,added      # just these change types
+crectl update-diff am --filter apimgt            # jars whose folder or name contains "apimgt"
+crectl update-diff am --backup ~/.wso2-updates/backup/wso2am-4.5.0-<id>   # an older backup, to span several runs
+crectl update-diff am --json
+```
+
+```text
+API Manager 4.5.0: update level 57 -> 83
+  Pack       /Users/me/work/wso2am-4.5.0
+  Backup     ~/.wso2-updates/backup/wso2am-4.5.0-c363d5ac-... (taken 10/13/2026, 4:34:25 PM)
+  Changelog  updates/changelog-0057-0083.md
+
+140 of 971 jars/wars changed: 130 upgraded, 8 modified, 2 added
+
+repository/components/plugins/  (102)
+  CHANGE    JAR / WAR                    BEFORE           AFTER            SIZE
+  upgraded  org.wso2.carbon.apimgt.impl  9.31.86.158      9.31.86.225      +89.5 KB
+  upgraded  httpcore-nio                 4.4.16.wso2v4    4.4.16.wso2v4_1  +45 B
+  ...
+```
+
+| Change | Meaning |
+|---|---|
+| `upgraded` | The jar was replaced by a new version (matched by name within the same folder) |
+| `modified` | Same file name, different content (compared by SHA-256) |
+| `added` / `removed` | Only in the updated pack / only in the backup |
+
+Runtime copies are left out: the OSGi bundle cache, `tmp/`, logs, webapp folders unpacked from a `.war`
+(the `.war` itself is compared), and the `dropins/*_1.0.0.jar` bundles Carbon regenerates from `lib/`
+on every start.
+
+A pack unzipped from an already-updated download (e.g. `wso2is-7.2.0.26.zip`) has an update level but no
+backup. Run the update tool on it, or point `--backup` at another pack of the same product.
+
+---
+
 ## JDK Management
 
 ### List installed JDKs
@@ -468,6 +514,7 @@ crectl inspect 48213 --json
 crectl usage --json
 crectl containers --json
 crectl log-level am --json
+crectl update-diff am --json
 ```
 
 For example:
