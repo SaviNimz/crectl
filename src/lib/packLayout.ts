@@ -9,6 +9,7 @@ import path from 'node:path';
  */
 export interface PackLayout {
   deploymentToml: string;
+  log4j2Properties: string;
   securityDir: string;
   libDir: string;
   dropinsDir: string;
@@ -21,8 +22,11 @@ export function getPackLayout(carbonHome: string): PackLayout {
   const usesRootLayout = !fs.existsSync(carbonStyleToml) && fs.existsSync(path.join(carbonHome, 'conf', 'deployment.toml'));
   const extensionsRoot = usesRootLayout ? carbonHome : path.join(carbonHome, 'repository', 'components');
 
+  const deploymentToml = usesRootLayout ? path.join(carbonHome, 'conf', 'deployment.toml') : carbonStyleToml;
+
   return {
-    deploymentToml: usesRootLayout ? path.join(carbonHome, 'conf', 'deployment.toml') : carbonStyleToml,
+    deploymentToml,
+    log4j2Properties: path.join(path.dirname(deploymentToml), 'log4j2.properties'),
     securityDir: path.join(carbonHome, 'repository', 'resources', 'security'),
     libDir: path.join(extensionsRoot, 'lib'),
     dropinsDir: path.join(extensionsRoot, 'dropins'),

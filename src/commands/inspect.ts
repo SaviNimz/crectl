@@ -1,37 +1,11 @@
 import type { Command } from 'commander';
-import fs from 'node:fs';
 import path from 'node:path';
-import { scanWso2Processes } from '../lib/processScan.js';
-import { selectRunningProcess } from '../lib/targetResolver.js';
-import { isWso2PackDirectory } from '../lib/packLayout.js';
+import { resolvePackTarget } from '../lib/targetResolver.js';
 import { inspectPack, type PackReport } from '../lib/packInspector.js';
 import { printSection, printTable } from '../lib/format.js';
-import type { WSO2Process } from '../types.js';
 
 // Beyond this many jars, show a count instead of the full list (use --json for everything).
 const MAX_JARS_TO_LIST = 15;
-
-interface InspectTarget {
-  carbonHome: string;
-  runningProcess: WSO2Process | null;
-}
-
-/** A target is either a pack directory (running or not) or a PID / name match against running products. */
-async function resolveInspectTarget(target: string): Promise<InspectTarget | null> {
-  const targetPath = path.resolve(target);
-  if (fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory()) {
-    if (!isWso2PackDirectory(targetPath)) {
-      console.error(`${targetPath} doesn't look like a WSO2 pack (no bin/ and deployment.toml).`);
-      process.exitCode = 1;
-      return null;
-    }
-    const runningProcess = scanWso2Processes().find((p) => path.resolve(p.carbonHome) === targetPath) ?? null;
-    return { carbonHome: targetPath, runningProcess };
-  }
-
-  const runningProcess = await selectRunningProcess(target);
-  return runningProcess ? { carbonHome: runningProcess.carbonHome, runningProcess } : null;
-}
 
 function describeRuntime(runtime: PackReport['runtime']): [string, string][] {
   const jdk = runtime.javaBinary ? `${runtime.javaVersion ?? 'unknown version'} (${runtime.javaBinary})` : 'unknown';
@@ -126,7 +100,7 @@ function register(program: Command): void {
     .option('--json', 'output as JSON')
     .addHelpText('after', '\n<target> is a pack directory (running or not), a PID, or a name match like "4.3.0".')
     .action(async (target: string, opts) => {
-      const resolved = await resolveInspectTarget(target);
+      const resolved = await resolvePackTarget(target);
       if (!resolved) return;
 
       const report = inspectPack(resolved.carbonHome, resolved.runningProcess);

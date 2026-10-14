@@ -62,6 +62,7 @@ to see the available options for any command.
 | `crectl stop <target>` | Stop a WSO2 product |
 | `crectl stop-all` | Stop all running WSO2 products |
 | `crectl dump <target>` | Capture thread dumps, heap dumps, or JFR recordings |
+| `crectl log-level <target> [presets/loggers]` | Turn on debug logging without a restart, and undo it |
 | `crectl jvm list` | List installed JDKs |
 | `crectl jvm current` | Show the currently active JDK |
 | `crectl jvm use <version>` | Switch to another JDK |
@@ -288,6 +289,44 @@ recording.jfr
 
 ---
 
+## Debug Logging
+
+`crectl log-level` turns on debug logging for common scenarios without you having to look up
+package names, and without a restart. A running server picks up the change within a few seconds.
+
+```bash
+crectl log-level am wire                      # wire logs on the running API Manager
+crectl log-level is oauth saml                # several presets at once
+crectl log-level 48213 org.foo.Bar --level TRACE
+crectl log-level ./wso2mi-4.4.0 synapse       # a pack that isn't running (applies on next start)
+crectl log-level am                           # show the active overrides
+crectl log-level am wire --reset              # turn one preset off again
+crectl log-level am --reset                   # back to the pack's own levels
+```
+
+| Preset | Loggers it turns on |
+|---|---|
+| `wire` | HTTP wire logs: raw headers and payloads through the gateway (APIM, MI) |
+| `passthru` | Pass-through HTTP transport: connections, timeouts, socket errors |
+| `synapse` | Mediation engine: sequences, mediators, endpoints (noisy) |
+| `gateway-auth` | Gateway OAuth, JWT and API key validation |
+| `throttling` | Gateway throttling decisions |
+| `keymanager` | Key manager calls: token validation, key generation, KM client |
+| `oauth` | OAuth2 / OIDC token issuance and validation (IS, APIM) |
+| `saml` | SAML SSO, as IdP and as federated authenticator |
+| `authn` | Authentication framework: login flows, steps, federated IdPs |
+| `userstore` | JDBC / LDAP / AD user store lookups |
+| `scim` | SCIM 2.0 user and group provisioning |
+
+Run `crectl log-level --help` for the full list. `<target>` is a PID, a name match, or a pack directory.
+
+**How it changes the pack:** `crectl` appends a marked block to `log4j2.properties` and never edits the
+pack's own lines. A logger the pack already declares is re-levelled in place, because the later line wins
+in a properties file; new loggers are added to the `loggers` list. `--reset` removes the block, leaving the
+file byte-for-byte as it was. Remember to reset before handing a pack back or zipping it up for a case.
+
+---
+
 ## JDK Management
 
 ### List installed JDKs
@@ -404,8 +443,14 @@ crectl status
 # Monitor CPU and memory
 crectl usage --sort mem
 
+# Turn on the relevant debug logs (no restart needed)
+crectl log-level 4.2.0 wire gateway-auth
+
 # Capture diagnostics while reproducing the issue
 crectl dump 4.2.0 --jfr 60
+
+# Put the log levels back
+crectl log-level 4.2.0 --reset
 
 # Stop or restart the product when needed
 crectl stop 4.2.0
@@ -422,6 +467,7 @@ crectl status --json
 crectl inspect 48213 --json
 crectl usage --json
 crectl containers --json
+crectl log-level am --json
 ```
 
 For example:

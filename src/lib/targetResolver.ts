@@ -1,4 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import prompts from 'prompts';
+import { isWso2PackDirectory } from './packLayout.js';
 import { scanWso2Processes } from './processScan.js';
 import type { WSO2Process } from '../types.js';
 
@@ -51,4 +54,26 @@ export async function selectRunningProcess(target: string): Promise<WSO2Process 
     return null;
   }
   return matches.find((p) => p.pid === answer.pid) ?? null;
+}
+
+export interface PackTarget {
+  carbonHome: string;
+  runningProcess: WSO2Process | null;
+}
+
+/** A target is either a pack directory (running or not) or a PID / name match against running products. */
+export async function resolvePackTarget(target: string): Promise<PackTarget | null> {
+  const targetPath = path.resolve(target);
+  if (fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory()) {
+    if (!isWso2PackDirectory(targetPath)) {
+      console.error(`${targetPath} doesn't look like a WSO2 pack (no bin/ and deployment.toml).`);
+      process.exitCode = 1;
+      return null;
+    }
+    const runningProcess = scanWso2Processes().find((p) => path.resolve(p.carbonHome) === targetPath) ?? null;
+    return { carbonHome: targetPath, runningProcess };
+  }
+
+  const runningProcess = await selectRunningProcess(target);
+  return runningProcess ? { carbonHome: runningProcess.carbonHome, runningProcess } : null;
 }
